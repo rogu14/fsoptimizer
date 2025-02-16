@@ -196,14 +196,6 @@
                     <span class="tooltiptext">
                         Put the number of Dim Origins you want to use. We will use the number of dims that is optimal. 
                         Example: You input "5" but overall cost is the same as "4" so not all of them will be used.
-
-                        100-104 → 6
-                        105-115 → 5
-                        116-129 → 4
-                        130-159 → 3
-                        160-209 → 2
-                        210-291 → 1
-                        292-299 → 1 (97.9% chance)
                     </span>
                 </span>
             </label>
@@ -248,10 +240,9 @@
         </tbody>
     </table>
 
-    <footer>Made by Rogu14. Version 1.01</footer>
+    <footer>Made by Rogu14</footer>
 
     <script>
-        
         const originSteps = [
             { range: [100, 101], increase: 26 },
             { range: [102, 105], increase: 25 },
@@ -315,9 +306,7 @@
 
         document.getElementById('originTooltip').textContent = formatTooltip(originSteps);
 
-
         document.getElementById('faintTooltip').textContent = formatTooltip(faintSteps);
-
 
         function getIncrease(stack, steps) {
             for (let step of steps) {
@@ -328,24 +317,20 @@
             return 0;
         }
 
-
         function calculatePathForDimOrigins(dimOriginAvailable) {
             const start = parseInt(document.getElementById('startFailstack').value);
             const target = parseInt(document.getElementById('targetFailstack').value);
             const priceOrigin = parseInt(document.getElementById('priceOrigin').value);
             const priceFaintOrigin = parseInt(document.getElementById('priceFaintOrigin').value);
 
-
             let dp = Array.from({ length: 301 }, () => Array(dimOriginAvailable + 1).fill(Infinity));
             let path = Array.from({ length: 301 }, () => Array(dimOriginAvailable + 1).fill(null));
 
             dp[start][dimOriginAvailable] = 0;
 
-
             for (let current = start; current < 300; current++) {
                 for (let yLeft = 0; yLeft <= dimOriginAvailable; yLeft++) {
                     if (dp[current][yLeft] === Infinity) continue;
-
 
                     if (yLeft > 0) {
                         const yInc = getIncrease(current, dimOriginSteps);
@@ -364,7 +349,6 @@
                         }
                     }
 
-
                     const xInc = getIncrease(current, originSteps);
                     if (xInc > 0) {
                         const next = Math.min(current + xInc, 300);
@@ -379,7 +363,6 @@
                             };
                         }
                     }
-
 
                     const zInc = getIncrease(current, faintSteps);
                     if (zInc > 0) {
@@ -399,15 +382,14 @@
             }
 
             let bestTarget = target;
-            if (dp[target][0] === Infinity) {
-                for (let i = target - 1; i <= 300; i++) {
-                    if (dp[i][0] < Infinity) {
-                        bestTarget = i;
-                        break;
-                    }
+            let bestCost = Infinity;
+
+            for (let i = target; i <= 300; i++) {
+                if (dp[i][0] < bestCost) {
+                    bestTarget = i;
+                    bestCost = dp[i][0];
                 }
             }
-
 
             let steps = [];
             let current = bestTarget;
@@ -421,7 +403,7 @@
             }
 
             steps.reverse();
-            return { steps, totalCost: dp[bestTarget][0], yUsed: dimOriginAvailable - yLeft };
+            return { steps, totalCost: bestCost, yUsed: dimOriginAvailable - yLeft, finalFailstack: bestTarget };
         }
 
         function calculateOptimalPath() {
@@ -429,15 +411,12 @@
             const target = parseInt(document.getElementById('targetFailstack').value);
             const errorMessage = document.getElementById('errorMessage');
 
-
             errorMessage.textContent = '';
-
 
             if (start < 100) {
                 errorMessage.textContent = 'Incorrect starting failstack, must be 100 or higher';
                 return;
             }
-
 
             if (target > 300) {
                 errorMessage.textContent = 'Incorrect target failstack, must be 300 or lower';
@@ -446,34 +425,31 @@
 
             const dimOriginAvailable = parseInt(document.getElementById('dimOrigin').value) || 0;
 
-
             let bestPath = null;
             let bestCost = Infinity;
             let bestYUsed = Infinity;
+            let bestFinalFailstack = target;
 
             for (let y = 0; y <= dimOriginAvailable; y++) {
-                const { steps, totalCost, yUsed } = calculatePathForDimOrigins(y);
+                const { steps, totalCost, yUsed, finalFailstack } = calculatePathForDimOrigins(y);
                 if (totalCost < bestCost || (totalCost === bestCost && yUsed < bestYUsed)) {
                     bestPath = steps;
                     bestCost = totalCost;
                     bestYUsed = yUsed;
+                    bestFinalFailstack = finalFailstack;
                 }
             }
 
-
-            displayResults(bestPath, bestCost);
+            displayResults(bestPath, bestCost, bestFinalFailstack);
         }
-
 
         function formatCost(cost) {
             return (cost / 1000000000).toFixed(1) + 'B';
         }
 
-
-        function displayResults(steps, totalCost) {
+        function displayResults(steps, totalCost, finalFailstack) {
             const resultsTable = document.getElementById('results').querySelector('tbody');
             resultsTable.innerHTML = '';
-
 
             let originCount = 0;
             let faintCount = 0;
@@ -497,13 +473,13 @@
                 `;
                 resultsTable.appendChild(row);
 
-                
+                // Count materials
                 if (step.item === 'Origin of Dark Hunger') originCount++;
                 else if (step.item === 'Faint Origin of Dark Hunger') faintCount++;
                 else if (step.item === 'Dim Origin') dimCount++;
             });
 
-            
+            // Display material counts
             const materialCountDiv = document.getElementById('materialCount');
             materialCountDiv.innerHTML = `
                 <span>Materials Used:</span>
@@ -512,9 +488,12 @@
                 <span><img src="https://bdocodex.com/items/new_icon/03_etc/00760738.webp" alt="Dim Origin of Hunger" width="24" height="24"> ${dimCount}</span>
             `;
 
-            
+            // Display total cost and final failstack
             const totalCostDiv = document.getElementById('totalCost');
-            totalCostDiv.innerHTML = `<span>Total Cost: ${formatCost(totalCost)}</span>`;
+            totalCostDiv.innerHTML = `
+                <span>Total Cost: ${formatCost(totalCost)}</span>
+                <span>Final Failstack: ${finalFailstack}</span>
+            `;
         }
     </script>
 </body>
